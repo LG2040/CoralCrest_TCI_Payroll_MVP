@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TCI Payroll</title>
+<meta name="description" content="Payroll MVP for Turks and Caicos employers: hours import, NIB and NHIP contributions, payslips, remittance schedules and Xero journals.">
+<style>
+/* Layout: left rail of sections, one working area; data tables dominate, type stays quiet, coral marks the one action that matters on each screen. */
+:root {
+  --bg: #F6F3EC;
+  --panel: #FFFFFF;
+  --ink: #1F2A33;
+  --ink-soft: #5A6670;
+  --line: rgba(31,42,51,0.14);
+  --line-soft: rgba(31,42,51,0.07);
+  --coral: #F0665A;
+  --coral-deep: #D9503F;
+  --navy: #0F1B28;
+  --navy-fg: #F3EFE8;
+  --navy-muted: #9AA7B1;
+  --ok: #2E7D5B;
+  --warn: #B7791F;
+  --bad: #B3362A;
+  --display: Georgia, "Times New Roman", serif;
+  --ui: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--ui); font-size: 14px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3 { font-family: var(--display); font-weight: 400; margin: 0; letter-spacing: -0.005em; }
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1.05rem; }
+.num { font-variant-numeric: tabular-nums; text-align: right; }
+.muted { color: var(--ink-soft); }
+.small { font-size: 12px; }
+
+.app { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100%; }
+.rail { background: var(--navy); color: var(--navy-fg); padding: 22px 16px calc(22px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 6px; position: sticky; top: 0; height: 100svh; }
+.rail .logo { font-family: var(--display); font-size: 1.15rem; margin-bottom: 4px; }
+.rail .logo span { color: var(--coral); }
+.rail .tag { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--navy-muted); margin-bottom: 18px; }
+.rail button { background: none; border: 0; color: var(--navy-muted); text-align: left; padding: 9px 10px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+.rail button:hover { background: rgba(255,255,255,0.05); color: var(--navy-fg); }
+.rail button.active { background: rgba(240,102,90,0.16); color: var(--navy-fg); }
+.rail button:focus-visible { outline: 2px solid var(--coral); outline-offset: 1px; }
+.rail .count { font-size: 11px; background: rgba(255,255,255,0.1); padding: 1px 7px; border-radius: 999px; }
+.rail .foot { margin-top: auto; font-size: 11px; color: var(--navy-muted); line-height: 1.5; }
+
+.main { padding: 28px max(24px, env(safe-area-inset-right, 0px)) 80px 28px; min-width: 0; }
+.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+.head p { margin: 4px 0 0; color: var(--ink-soft); max-width: 64ch; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--ink-soft); }
+.btn:focus-visible { outline: 2px solid var(--coral); outline-offset: 1px; }
+.btn.primary { background: var(--coral); border-color: var(--coral); color: #fff; }
+.btn.primary:hover { background: var(--coral-deep); }
+.btn.danger { color: var(--bad); }
+.btn[disabled] { opacity: .5; cursor: default; }
+.btn.sm { padding: 4px 9px; font-size: 12px; }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; min-width: 0; }
+.panel + .panel { margin-top: 16px; }
+.panel h2 { margin-bottom: 12px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.card .k { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); }
+.card .v { font-family: var(--display); font-size: 1.6rem; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.card .s { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line-soft); text-align: left; vertical-align: middle; white-space: nowrap; }
+th { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; border-bottom: 1px solid var(--line); }
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.total td { font-weight: 600; border-top: 1px solid var(--line); border-bottom: 0; }
+tbody tr:hover { background: rgba(31,42,51,0.025); }
+td input, td select { width: 100%; min-width: 70px; border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; background: #fff; }
+td input.num { text-align: right; }
+
+.form { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 16px; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
+.field input, .field select, .field textarea { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; background: #fff; width: 100%; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid rgba(240,102,90,0.45); outline-offset: 0; border-color: var(--coral); }
+.field .hint { font-size: 11px; color: var(--ink-soft); }
+.field.wide { grid-column: 1 / -1; }
+.check { display: flex; align-items: center; gap: 8px; padding-top: 22px; }
+.check input { width: 16px; height: 16px; }
+
+.pill { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-soft); }
+.pill.ok { color: var(--ok); border-color: rgba(46,125,91,0.35); background: rgba(46,125,91,0.06); }
+.pill.warn { color: var(--warn); border-color: rgba(183,121,31,0.4); background: rgba(183,121,31,0.08); }
+.pill.bad { color: var(--bad); border-color: rgba(179,54,42,0.4); background: rgba(179,54,42,0.06); }
+.pill.navy { color: var(--navy-fg); background: var(--navy); border-color: var(--navy); }
+
+.note { border-left: 3px solid var(--coral); padding: 8px 12px; background: rgba(240,102,90,0.06); border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 13px; }
+.note.warn { border-color: var(--warn); background: rgba(183,121,31,0.07); }
+textarea.paste { width: 100%; min-height: 150px; font-family: var(--mono); font-size: 12px; border: 1px solid var(--line); border-radius: 6px; padding: 10px; }
+pre.out { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 12px; font-family: var(--mono); font-size: 12px; overflow-x: auto; max-height: 320px; }
+.modal-bg { position: fixed; inset: 0; background: rgba(15,27,40,0.55); display: grid; place-items: center; padding: 20px; z-index: 20; }
+.modal { background: var(--panel); border-radius: 10px; padding: 22px 24px; width: min(880px, 100%); max-height: 92svh; overflow: auto; }
+.modal h2 { margin-bottom: 16px; }
+.modal .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+.toast { position: fixed; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--navy); color: var(--navy-fg); padding: 10px 16px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 30; }
+.toast.show { opacity: 1; }
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.rules .panel { padding: 14px 16px; }
+.rules dl { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; font-size: 13px; }
+.rules dt { color: var(--ink-soft); }
+.rules dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Payslip */
+.slip { background: #fff; color: #1F2A33; border: 1px solid var(--line); border-radius: 8px; padding: 28px 32px; max-width: 760px; margin: 0 auto 18px; font-size: 13px; page-break-after: always; }
+.slip .top { display: flex; justify-content: space-between; gap: 20px; border-bottom: 2px solid var(--coral); padding-bottom: 14px; margin-bottom: 16px; flex-wrap: wrap; }
+.slip .top h2 { font-size: 1.3rem; }
+.slip .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px 16px; margin-bottom: 16px; }
+.slip .meta div { font-size: 12px; }
+.slip .meta b { display: block; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; }
+.slip .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.slip table { font-size: 12.5px; }
+.slip .net { margin-top: 16px; display: flex; justify-content: space-between; align-items: center; background: var(--navy); color: var(--navy-fg); padding: 12px 16px; border-radius: 6px; }
+.slip .net .v { font-family: var(--display); font-size: 1.5rem; }
+.slip .foot { margin-top: 14px; font-size: 11px; color: var(--ink-soft); }
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  .rail { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px; padding: 12px max(12px, env(safe-area-inset-right, 0px)) 12px max(12px, env(safe-area-inset-left, 0px)); }
+  .rail .logo, .rail .tag { width: 100%; margin: 0; }
+  .rail .tag { margin-bottom: 8px; }
+  .rail button { padding: 7px 10px; font-size: 13px; }
+  .rail .foot { display: none; }
+  .main { padding: 18px max(16px, env(safe-area-inset-right, 0px)) 60px max(16px, env(safe-area-inset-left, 0px)); }
+  .slip .cols { grid-template-columns: 1fr; }
+  .slip { padding: 20px 16px; }
+}
+@media print {
+  body { background: #fff; }
+  .rail, .head, .noprint, .toast { display: none !important; }
+  .app { display: block; }
+  .main { padding: 0; }
+  .slip { border: 0; margin: 0 0 24px; max-width: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="Sections">
+    <div class="logo">TCI <span>Payroll</span></div>
+    <div class="tag">MVP · Turks and Caicos</div>
+    <button data-view="dashboard" class="active">Overview</button>
+    <button data-view="employees">Employees <span class="count" id="c-emp">0</span></button>
+    <button data-view="hours">Hours import</button>
+    <button data-view="payruns">Pay runs <span class="count" id="c-runs">0</span></button>
+    <button data-view="reports">Remittances &amp; Xero</button>
+    <button data-view="settings">Settings &amp; rules</button>
+    <div class="foot">Data stays in this browser. Use Settings to back up or restore.<br><br>Built by CoralCrest Consulting Limited.</div>
+  </nav>
+  <main class="main" id="main"></main>
+</div>
+<div class="toast" id="toast"></div>
+<div id="modal-root"></div>
+
+<script>
+/* ===================== Statutory defaults (editable in Settings) ===================== */
+const DEFAULT_RULES = {
+  nibEmployee: 5.5, nibEmployer: 6.5, nibSelfEmployed: 10, nibCeilingMonthly: 4000,
+  nhipEmployee: 3, nhipEmployer: 3, nhipCeilingMonthly: 7800, nhipMinMonthlyEachSide: 25,
+  standardWeekHours: 44, overtimeMultiplier: 1.5, holidayMultiplier: 2,
+  minWage: 8, minWageSector: 9,
+  nibDueDay: 15, nhipDueDay: 14
+};
+const PERIODS_PER_YEAR = { weekly: 52, biweekly: 26, monthly: 12 };
+const PERIOD_LABEL = { weekly: 'Weekly', biweekly: 'Bi-weekly', monthly: 'Monthly' };
+
+/* ===================== State ===================== */
+const KEY = 'tci-payroll-mvp-v1';
+let S = load();
+function blank() {
+  return {
+    company: { name: 'Demo Company Ltd', nibNo: 'E-00000', nhipNo: 'EMP-00000', address: 'Providenciales, Turks and Caicos Islands', payFrequency: 'biweekly', island: 'Providenciales' },
+    rules: { ...DEFAULT_RULES },
+    employees: [], hoursBatches: [], payruns: [], seq: { emp: 1, run: 1 }
+  };
+}
+function load() { try { const r = localStorage.getItem(KEY); if (r) return JSON.parse(r); } catch (e) {} return null; }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Could not save in this browser'); } refreshCounts(); }
+function toast(m) { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2400); }
+
+/* ===================== Demo data ===================== */
+function seedDemo() {
+  const d = blank();
+  const emps = [
+    ['Marisol Forbes', 'hourly', 14.00, 'hospitality', false, 'Front desk'],
+    ['Devon Handfield', 'hourly', 18.50, 'construction', false, 'Site foreman'],
+    ['Kemar Lightbourne', 'hourly', 9.00, 'security', true, 'Security officer'],
+    ['Alicia Rigby', 'salaried', 6500, 'general', false, 'Operations manager'],
+    ['Jean-Paul Dorsainvil', 'hourly', 12.00, 'general', true, 'Groundskeeper'],
+    ['Tamika Ewing', 'salaried', 3200, 'general', false, 'Bookkeeper'],
+    ['Oscar Delancy', 'hourly', 22.00, 'general', false, 'Boat captain'],
+    ['Priya Saunders', 'salaried', 9800, 'financial services', false, 'Finance director']
+  ];
+  emps.forEach((e, i) => d.employees.push({
+    id: 'E' + String(100 + i + 1), name: e[0], type: e[1], rate: e[2], sector: e[3], workPermit: e[4], role: e[5],
+    nibNo: 'NIB' + (47210 + i * 37), nhipNo: 'NHP' + (88100 + i * 53), startDate: '2024-0' + ((i % 8) + 1) + '-15',
+    bank: ['FirstCaribbean', 'Scotiabank', 'RBC'][i % 3], account: String(100200 + i * 911), status: 'active', fixedAllowance: i === 3 ? 250 : 0, loanDeduction: i === 1 ? 75 : 0
+  }));
+  d.seq.emp = 109;
+  d.hoursBatches.push({ id: 'H1', label: 'Lathem export 13-26 Oct 2026', periodStart: '2026-10-13', periodEnd: '2026-10-26', source: 'demo', rows: [
+    { empId: 'E101', regular: 86, overtime: 4, holiday: 0 }, { empId: 'E102', regular: 88, overtime: 11.5, holiday: 8 },
+    { empId: 'E103', regular: 88, overtime: 16, holiday: 8 }, { empId: 'E105', regular: 80, overtime: 0, holiday: 0 },
+    { empId: 'E107', regular: 70, overtime: 6, holiday: 0 } ] });
+  return d;
+}
+if (!S) { S = seedDemo(); save(); }
+
+/* ===================== Helpers ===================== */
+const money = n => (n < 0 ? '-' : '') + '$' + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const r2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+const emp = id => S.employees.find(e => e.id === id);
+function periodFactor(freq) { return 12 / PERIODS_PER_YEAR[freq]; } // fraction of a month per period
+function refreshCounts() { document.getElementById('c-emp').textContent = S.employees.filter(e => e.status === 'active').length; document.getElementById('c-runs').textContent = S.payruns.length; }
+
+/* ===================== Payroll engine ===================== */
+function calcLine(e, hours, freq, rules) {
+  const f = periodFactor(freq);
+  const h = hours || { regular: 0, overtime: 0, holiday: 0 };
+  let basic = 0, ot = 0, hol = 0;
+  if (e.type === 'hourly') {
+    basic = r2(h.regular * e.rate);
+    ot = r2(h.overtime * e.rate * rules.overtimeMultiplier);
+    hol = r2(h.holiday * e.rate * rules.holidayMultiplier);
+  } else {
+    basic = r2(e.rate * f); // monthly salary spread over the period
+    ot = r2((h.overtime || 0) * hourlyEquivalent(e, rules) * rules.overtimeMultiplier);
+    hol = r2((h.holiday || 0) * hourlyEquivalent(e, rules) * rules.holidayMultiplier);
+  }
+  const allowance = r2(e.fixedAllowance || 0) ;
+  const gross = r2(basic + ot + hol + allowance);
+  // NIB: insurable earnings capped at the ceiling scaled to the period
+  const nibCeiling = r2(rules.nibCeilingMonthly * f);
+  const nibBase = Math.min(gross, nibCeiling);
+  const nibEE = r2(nibBase * rules.nibEmployee / 100);
+  const nibER = r2(nibBase * rules.nibEmployer / 100);
+  // NHIP: capped at its ceiling, with a minimum contribution per side scaled to the period
+  const nhipCeiling = r2(rules.nhipCeilingMonthly * f);
+  const nhipMin = r2(rules.nhipMinMonthlyEachSide * f);
+  const nhipBase = Math.min(gross, nhipCeiling);
+  const nhipEE = r2(Math.max(nhipBase * rules.nhipEmployee / 100, gross > 0 ? nhipMin : 0));
+  const nhipER = r2(Math.max(nhipBase * rules.nhipEmployer / 100, gross > 0 ? nhipMin : 0));
+  const loan = r2(e.loanDeduction || 0);
+  const deductions = r2(nibEE + nhipEE + loan);
+  const net = r2(gross - deductions);
+  const employerCost = r2(gross + nibER + nhipER);
+  const flags = [];
+  if (e.type === 'hourly') {
+    const mw = ['security', 'manufacturing', 'construction', 'banking', 'financial services', 'insurance'].includes(e.sector) ? rules.minWageSector : rules.minWage;
+    if (e.rate < mw) flags.push('Below minimum wage (' + money(mw) + '/h)');
+  }
+  if (gross >= nibCeiling && gross > 0) flags.push('NIB ceiling reached');
+  if (gross > 0 && nhipBase * rules.nhipEmployee / 100 < nhipMin) flags.push('NHIP minimum applied');
+  if (e.workPermit && !e.nhipNo) flags.push('Work permit holder without NHIP number');
+  if (net < 0) flags.push('Negative net pay');
+  return { empId: e.id, name: e.name, type: e.type, hours: { regular: h.regular || 0, overtime: h.overtime || 0, holiday: h.holiday || 0 }, basic, ot, hol, allowance, gross, nibBase, nibEE, nibER, nhipBase, nhipEE, nhipER, loan, deductions, net, employerCost, flags };
+}
+function hourlyEquivalent(e, rules) { return e.rate * 12 / 52 / rules.standardWeekHours; }
+function runTotals(lines) {
+  const t = { gross: 0, nibEE: 0, nibER: 0, nhipEE: 0, nhipER: 0, loan: 0, net: 0, employerCost: 0 };
+  lines.forEach(l => Object.keys(t).forEach(k => t[k] = r2(t[k] + l[k])));
+  return t;
+}
+
+/* ===================== Views ===================== */
+const views = {};
+let view = 'dashboard';
+function go(v) { view = v; document.querySelectorAll('.rail button').forEach(b => b.classList.toggle('active', b.dataset.view === v)); render(); window.scrollTo(0, 0); }
+function render() { document.getElementById('main').innerHTML = views[view](); bind(); refreshCounts(); }
+document.querySelectorAll('.rail button').forEach(b => b.addEventListener('click', () => go(b.dataset.view)));
+
+/* ---------- Dashboard ---------- */
+views.dashboard = () => {
+  const active = S.employees.filter(e => e.status === 'active');
+  const last = S.payruns[S.payruns.length - 1];
+  const t = last ? runTotals(last.lines) : null;
+  const monthKey = last ? last.periodEnd.slice(0, 7) : null;
+  const nibDue = monthKey ? dueDate(monthKey, S.rules.nibDueDay) : '';
+  const nhipDue = monthKey ? dueDate(monthKey, S.rules.nhipDueDay) : '';
+  return `
+  <div class="head"><div><h1>${esc(S.company.name)}</h1><p>${PERIOD_LABEL[S.company.payFrequency]} payroll · ${active.length} active employees · NIB ${esc(S.company.nibNo)} · NHIP ${esc(S.company.nhipNo)}</p></div>
+  <div class="actions"><button class="btn primary" data-act="newrun">New pay run</button></div></div>
+  <div class="cards">
+    <div class="card"><div class="k">Last run gross</div><div class="v">${t ? money(t.gross) : '–'}</div><div class="s">${last ? fmtDate(last.periodStart) + ' to ' + fmtDate(last.periodEnd) : 'No pay runs yet'}</div></div>
+    <div class="card"><div class="k">Net paid</div><div class="v">${t ? money(t.net) : '–'}</div><div class="s">${last ? last.lines.length + ' payslips' : ''}</div></div>
+    <div class="card"><div class="k">NIB to remit</div><div class="v">${t ? money(t.nibEE + t.nibER) : '–'}</div><div class="s">${nibDue ? 'Due ' + nibDue : 'Employee + employer'}</div></div>
+    <div class="card"><div class="k">NHIP to remit</div><div class="v">${t ? money(t.nhipEE + t.nhipER) : '–'}</div><div class="s">${nhipDue ? 'Due ' + nhipDue : 'Employee + employer'}</div></div>
+    <div class="card"><div class="k">Employer cost</div><div class="v">${t ? money(t.employerCost) : '–'}</div><div class="s">Gross plus employer NIB and NHIP</div></div>
+  </div>
+  <div class="panel"><h2>How a pay run flows</h2>
+    <ol style="margin:0;padding-left:20px;display:grid;gap:6px;max-width:70ch">
+      <li><b>Hours import</b>: paste the Lathem time clock export (or key hours by hand). Salaried staff need no hours.</li>
+      <li><b>Pay run</b>: pick the hours batch, review gross, NIB, NHIP and net per person, fix anything flagged, then finalise.</li>
+      <li><b>Payslips</b>: open any finalised run and print or save the slips as PDF.</li>
+      <li><b>Remittances &amp; Xero</b>: monthly NIB and NHIP schedules, a bank payment file, and a Xero manual journal CSV.</li>
+    </ol>
+    <div class="note">This is an MVP with demo data. Statutory rates and ceilings sit in Settings and should be confirmed against the current NIB and NHIP notices before live use.</div>
+  </div>
+  <div class="panel"><h2>Recent pay runs</h2>${runsTable(S.payruns.slice(-5).reverse())}</div>`;
+};
+function dueDate(monthKey, day) { const [y, m] = monthKey.split('-').map(Number); const d = new Date(y, m, day); return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
+function runsTable(runs) {
+  if (!runs.length) return '<p class="muted">None yet.</p>';
+  return `<div class="tablewrap"><table><thead><tr><th>Run</th><th>Period</th><th>Pay date</th><th>Status</th><th class="num">Staff</th><th class="num">Gross</th><th class="num">Net</th><th class="num">NIB</th><th class="num">NHIP</th><th></th></tr></thead><tbody>` +
+    runs.map(r => { const t = runTotals(r.lines); return `<tr><td>${esc(r.id)}</td><td>${fmtDate(r.periodStart)} to ${fmtDate(r.periodEnd)}</td><td>${fmtDate(r.payDate)}</td><td><span class="pill ${r.status === 'final' ? 'ok' : 'warn'}">${r.status === 'final' ? 'Finalised' : 'Draft'}</span></td><td class="num">${r.lines.length}</td><td class="num">${money(t.gross)}</td><td class="num">${money(t.net)}</td><td class="num">${money(t.nibEE + t.nibER)}</td><td class="num">${money(t.nhipEE + t.nhipER)}</td><td><button class="btn sm" data-act="openrun" data-id="${r.id}">Open</button></td></tr>`; }).join('') + '</tbody></table></div>';
+}
+
+/* ---------- Employees ---------- */
+views.employees = () => `
+  <div class="head"><div><h1>Employees</h1><p>Master data for everyone on payroll. Hourly staff are paid from imported hours; salaried staff from their monthly salary spread across the pay period.</p></div>
+  <div class="actions"><button class="btn" data-act="exportemp">Export CSV</button><button class="btn primary" data-act="addemp">Add employee</button></div></div>
+  <div class="panel"><div class="tablewrap"><table><thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Type</th><th class="num">Rate</th><th>Sector</th><th>NIB no.</th><th>NHIP no.</th><th>Permit</th><th>Status</th><th></th></tr></thead><tbody>` +
+  S.employees.map(e => `<tr><td>${esc(e.id)}</td><td>${esc(e.name)}</td><td class="muted">${esc(e.role || '')}</td><td>${e.type === 'hourly' ? 'Hourly' : 'Salaried'}</td><td class="num">${e.type === 'hourly' ? money(e.rate) + '/h' : money(e.rate) + '/mo'}</td><td>${esc(e.sector)}</td><td>${esc(e.nibNo)}</td><td>${e.nhipNo ? esc(e.nhipNo) : '<span class="pill bad">missing</span>'}</td><td>${e.workPermit ? '<span class="pill">Work permit</span>' : ''}</td><td><span class="pill ${e.status === 'active' ? 'ok' : ''}">${e.status}</span></td><td><button class="btn sm" data-act="editemp" data-id="${e.id}">Edit</button></td></tr>`).join('') +
+  `</tbody></table></div></div>`;
+
+function empForm(e) {
+  e = e || { id: 'E' + (100 + S.seq.emp), name: '', role: '', type: 'hourly', rate: 10, sector: 'general', nibNo: '', nhipNo: '', workPermit: false, startDate: '', bank: '', account: '', status: 'active', fixedAllowance: 0, loanDeduction: 0 };
+  const sectors = ['general', 'hospitality', 'construction', 'security', 'manufacturing', 'banking', 'financial services', 'insurance', 'retail', 'public sector'];
+  modal(`<h2>${e.name ? 'Edit employee' : 'New employee'}</h2>
+  <div class="form">
+    <div class="field"><label>Employee ID</label><input id="f-id" value="${esc(e.id)}" ${e.name ? 'readonly' : ''}><span class="hint">Must match the ID in the time clock export</span></div>
+    <div class="field"><label>Full name</label><input id="f-name" value="${esc(e.name)}"></div>
+    <div class="field"><label>Role</label><input id="f-role" value="${esc(e.role || '')}"></div>
+    <div class="field"><label>Pay type</label><select id="f-type"><option value="hourly" ${e.type === 'hourly' ? 'selected' : ''}>Hourly</option><option value="salaried" ${e.type === 'salaried' ? 'selected' : ''}>Salaried (monthly)</option></select></div>
+    <div class="field"><label>Rate (hourly) or monthly salary</label><input id="f-rate" type="number" step="0.01" min="0" value="${e.rate}"></div>
+    <div class="field"><label>Sector (for minimum wage)</label><select id="f-sector">${sectors.map(s => `<option ${s === e.sector ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+    <div class="field"><label>NIB number</label><input id="f-nib" value="${esc(e.nibNo)}"></div>
+    <div class="field"><label>NHIP number</label><input id="f-nhip" value="${esc(e.nhipNo)}"></div>
+    <div class="field"><label>Start date</label><input id="f-start" type="date" value="${esc(e.startDate)}"></div>
+    <div class="field"><label>Fixed allowance per period</label><input id="f-allow" type="number" step="0.01" min="0" value="${e.fixedAllowance || 0}"><span class="hint">Housing, phone etc. Counts toward insurable earnings.</span></div>
+    <div class="field"><label>Loan / advance deduction per period</label><input id="f-loan" type="number" step="0.01" min="0" value="${e.loanDeduction || 0}"></div>
+    <div class="field"><label>Bank</label><input id="f-bank" value="${esc(e.bank || '')}"></div>
+    <div class="field"><label>Account number</label><input id="f-acct" value="${esc(e.account || '')}"></div>
+    <div class="field"><label>Status</label><select id="f-status"><option ${e.status === 'active' ? 'selected' : ''}>active</option><option ${e.status === 'inactive' ? 'selected' : ''}>inactive</option></select></div>
+    <div class="field check"><input type="checkbox" id="f-permit" ${e.workPermit ? 'checked' : ''}><label for="f-permit" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)">Work permit holder</label></div>
+  </div>
+  <div class="foot">${e.name ? '<button class="btn danger" id="m-del">Remove</button>' : ''}<button class="btn" id="m-cancel">Cancel</button><button class="btn primary" id="m-save">Save</button></div>`);
+  document.getElementById('m-save').onclick = () => {
+    const g = id => document.getElementById(id).value.trim();
+    const rec = { id: g('f-id'), name: g('f-name'), role: g('f-role'), type: g('f-type'), rate: +g('f-rate') || 0, sector: g('f-sector'), nibNo: g('f-nib'), nhipNo: g('f-nhip'), startDate: g('f-start'), fixedAllowance: +g('f-allow') || 0, loanDeduction: +g('f-loan') || 0, bank: g('f-bank'), account: g('f-acct'), status: g('f-status'), workPermit: document.getElementById('f-permit').checked };
+    if (!rec.id || !rec.name) { toast('ID and name are required'); return; }
+    const i = S.employees.findIndex(x => x.id === rec.id);
+    if (i >= 0) S.employees[i] = rec; else { if (S.employees.some(x => x.id === rec.id)) { toast('That ID already exists'); return; } S.employees.push(rec); S.seq.emp++; }
+    save(); closeModal(); render(); toast('Saved');
+  };
+  const del = document.getElementById('m-del'); if (del) del.onclick = () => { S.employees = S.employees.filter(x => x.id !== e.id); save(); closeModal(); render(); };
+}
+
+/* ---------- Hours import ---------- */
+views.hours = () => `
+  <div class="head"><div><h1>Hours import</h1><p>Paste the export from the Lathem time clock (or any CSV with an employee ID and hours). Columns are detected by name; unmatched IDs are listed so they can be fixed before the pay run.</p></div></div>
+  <div class="panel"><h2>New batch</h2>
+    <div class="form">
+      <div class="field"><label>Batch label</label><input id="h-label" placeholder="Lathem export 27 Oct to 9 Nov"></div>
+      <div class="field"><label>Period start</label><input id="h-start" type="date"></div>
+      <div class="field"><label>Period end</label><input id="h-end" type="date"></div>
+    </div>
+    <div class="field" style="margin-top:12px"><label>CSV (header row + one line per employee)</label>
+      <textarea class="paste" id="h-csv" placeholder="Employee ID,Name,Regular Hours,Overtime Hours,Holiday Hours
+E101,Marisol Forbes,86,4,0
+E102,Devon Handfield,88,11.5,8"></textarea>
+      <span class="hint">Accepted headers (any order, case-insensitive): id / employee id / emp no · regular / reg / hours · overtime / ot · holiday / hol. Extra columns are ignored.</span></div>
+    <div class="actions" style="margin-top:12px"><button class="btn" data-act="hsample">Load sample</button><button class="btn primary" data-act="hparse">Preview</button></div>
+    <div id="h-preview"></div>
+  </div>
+  <div class="panel"><h2>Saved batches</h2>${S.hoursBatches.length ? `<div class="tablewrap"><table><thead><tr><th>Batch</th><th>Period</th><th class="num">Rows</th><th class="num">Regular</th><th class="num">Overtime</th><th class="num">Holiday</th><th></th></tr></thead><tbody>` +
+    S.hoursBatches.slice().reverse().map(b => { const s = b.rows.reduce((a, r) => ({ r: a.r + r.regular, o: a.o + r.overtime, h: a.h + r.holiday }), { r: 0, o: 0, h: 0 }); return `<tr><td>${esc(b.label)}</td><td>${fmtDate(b.periodStart)} to ${fmtDate(b.periodEnd)}</td><td class="num">${b.rows.length}</td><td class="num">${s.r}</td><td class="num">${s.o}</td><td class="num">${s.h}</td><td><button class="btn sm" data-act="hview" data-id="${b.id}">View</button> <button class="btn sm danger" data-act="hdel" data-id="${b.id}">Delete</button></td></tr>`; }).join('') + '</tbody></table></div>' : '<p class="muted">None yet.</p>'}</div>`;
+
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return { rows: [], errors: ['Need a header row and at least one data row'] };
+  const split = l => l.split(/,|\t|;/).map(c => c.trim().replace(/^"|"$/g, ''));
+  const head = split(lines[0]).map(h => h.toLowerCase());
+  const find = (...names) => head.findIndex(h => names.some(n => h === n || h.includes(n)));
+  const ci = find('employee id', 'emp id', 'emp no', 'employee no', 'id'), ri = find('regular', 'reg', 'hours'), oi = find('overtime', 'ot'), hi = find('holiday', 'hol');
+  const errors = [];
+  if (ci < 0) errors.push('No employee ID column found');
+  if (ri < 0) errors.push('No regular hours column found');
+  const rows = [];
+  lines.slice(1).forEach((l, n) => {
+    const c = split(l); const id = c[ci];
+    if (!id) return;
+    const row = { empId: id, regular: +c[ri] || 0, overtime: oi >= 0 ? +c[oi] || 0 : 0, holiday: hi >= 0 ? +c[hi] || 0 : 0 };
+    if (!emp(id)) errors.push('Row ' + (n + 2) + ': employee ' + id + ' not found');
+    rows.push(row);
+  });
+  return { rows, errors };
+}
+function hoursPreview() {
+  const text = document.getElementById('h-csv').value;
+  const { rows, errors } = parseCSV(text);
+  const box = document.getElementById('h-preview');
+  box.innerHTML = (errors.length ? `<div class="note warn"><b>${errors.length} issue${errors.length > 1 ? 's' : ''}</b><br>${errors.map(esc).join('<br>')}</div>` : '') +
+    (rows.length ? `<div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>ID</th><th>Employee</th><th class="num">Regular</th><th class="num">Overtime</th><th class="num">Holiday</th><th>Check</th></tr></thead><tbody>` +
+      rows.map(r => { const e = emp(r.empId); const wk = r.regular + r.overtime; return `<tr><td>${esc(r.empId)}</td><td>${e ? esc(e.name) : '<span class="pill bad">unknown</span>'}</td><td class="num">${r.regular}</td><td class="num">${r.overtime}</td><td class="num">${r.holiday}</td><td>${e && e.type === 'salaried' ? '<span class="pill">salaried: only OT/holiday used</span>' : ''}${wk > 2 * 48 ? '<span class="pill warn">over 48h/week</span>' : ''}</td></tr>`; }).join('') +
+      `</tbody></table></div><div class="actions" style="margin-top:12px"><button class="btn primary" data-act="hsave" ${errors.some(x => x.includes('not found')) || errors.some(x => x.includes('column')) ? 'disabled' : ''}>Save batch</button></div>` : '');
+  box._rows = rows; bind();
+}
+
+/* ---------- Pay runs ---------- */
+views.payruns = () => `
+  <div class="head"><div><h1>Pay runs</h1><p>Each run takes one hours batch, applies the statutory rules in Settings, and produces payslips and remittance figures once finalised.</p></div>
+  <div class="actions"><button class="btn primary" data-act="newrun">New pay run</button></div></div>
+  <div class="panel">${runsTable(S.payruns.slice().reverse())}</div>`;
+
+function newRunForm() {
+  if (!S.hoursBatches.length && !S.employees.some(e => e.type === 'salaried')) { toast('Import hours first'); go('hours'); return; }
+  const last = S.hoursBatches[S.hoursBatches.length - 1];
+  modal(`<h2>New pay run</h2><div class="form">
+    <div class="field"><label>Hours batch</label><select id="r-batch"><option value="">None (salaried staff only)</option>${S.hoursBatches.map(b => `<option value="${b.id}" ${last && b.id === last.id ? 'selected' : ''}>${esc(b.label)}</option>`).join('')}</select></div>
+    <div class="field"><label>Pay frequency</label><select id="r-freq">${Object.keys(PERIOD_LABEL).map(k => `<option value="${k}" ${k === S.company.payFrequency ? 'selected' : ''}>${PERIOD_LABEL[k]}</option>`).join('')}</select></div>
+    <div class="field"><label>Period start</label><input id="r-start" type="date" value="${last ? last.periodStart : ''}"></div>
+    <div class="field"><label>Period end</label><input id="r-end" type="date" value="${last ? last.periodEnd : ''}"></div>
+    <div class="field"><label>Pay date</label><input id="r-pay" type="date" value="${last ? addDays(last.periodEnd, 4) : ''}"></div>
+  </div><div class="foot"><button class="btn" id="m-cancel">Cancel</button><button class="btn primary" id="m-save">Calculate</button></div>`);
+  document.getElementById('m-save').onclick = () => {
+    const g = id => document.getElementById(id).value;
+    const batch = S.hoursBatches.find(b => b.id === g('r-batch'));
+    const freq = g('r-freq');
+    if (!g('r-start') || !g('r-end') || !g('r-pay')) { toast('Dates are required'); return; }
+    const lines = S.employees.filter(e => e.status === 'active').map(e => {
+      const h = batch ? batch.rows.find(r => r.empId === e.id) : null;
+      if (e.type === 'hourly' && !h) return null;
+      return calcLine(e, h, freq, S.rules);
+    }).filter(Boolean);
+    const run = { id: 'PR' + String(S.seq.run).padStart(3, '0'), batchId: batch ? batch.id : null, freq, periodStart: g('r-start'), periodEnd: g('r-end'), payDate: g('r-pay'), status: 'draft', lines, rules: { ...S.rules }, created: new Date().toISOString() };
+    S.seq.run++; S.payruns.push(run); save(); closeModal(); openRun(run.id);
+  };
+}
+function addDays(d, n) { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); }
+
+let currentRun = null;
+function openRun(id) { currentRun = id; view = 'run'; render(); window.scrollTo(0, 0); }
+views.run = () => {
+  const r = S.payruns.find(x => x.id === currentRun); if (!r) return views.payruns();
+  const t = runTotals(r.lines);
+  const flagged = r.lines.filter(l => l.flags.length).length;
+  return `
+  <div class="head"><div><h1>Pay run ${esc(r.id)} <span class="pill ${r.status === 'final' ? 'ok' : 'warn'}" style="vertical-align:middle">${r.status === 'final' ? 'Finalised' : 'Draft'}</span></h1>
+    <p>${PERIOD_LABEL[r.freq]} · ${fmtDate(r.periodStart)} to ${fmtDate(r.periodEnd)} · paid ${fmtDate(r.payDate)} · NIB ${r.rules.nibEmployee}% / ${r.rules.nibEmployer}% to ${money(r.rules.nibCeilingMonthly)}/mo · NHIP ${r.rules.nhipEmployee}% / ${r.rules.nhipEmployer}% to ${money(r.rules.nhipCeilingMonthly)}/mo</p></div>
+    <div class="actions"><button class="btn" data-act="back">Back</button>
+      ${r.status === 'draft' ? `<button class="btn" data-act="recalc">Recalculate</button><button class="btn danger" data-act="delrun">Delete</button><button class="btn primary" data-act="finalise">Finalise run</button>` : `<button class="btn" data-act="payslips">Payslips</button><button class="btn" data-act="bankfile">Bank file CSV</button><button class="btn primary" data-act="xero">Xero journal CSV</button>`}
+    </div></div>
+  <div class="cards">
+    <div class="card"><div class="k">Gross</div><div class="v">${money(t.gross)}</div></div>
+    <div class="card"><div class="k">Employee deductions</div><div class="v">${money(t.nibEE + t.nhipEE + t.loan)}</div><div class="s">NIB ${money(t.nibEE)} · NHIP ${money(t.nhipEE)} · other ${money(t.loan)}</div></div>
+    <div class="card"><div class="k">Net pay</div><div class="v">${money(t.net)}</div><div class="s">${r.lines.length} employees</div></div>
+    <div class="card"><div class="k">Employer contributions</div><div class="v">${money(t.nibER + t.nhipER)}</div><div class="s">NIB ${money(t.nibER)} · NHIP ${money(t.nhipER)}</div></div>
+    <div class="card"><div class="k">Total employer cost</div><div class="v">${money(t.employerCost)}</div></div>
+  </div>
+  ${flagged ? `<div class="note warn">${flagged} line${flagged > 1 ? 's' : ''} flagged. Flags do not block finalising, but review them first.</div>` : ''}
+  <div class="panel"><div class="tablewrap"><table><thead><tr><th>Employee</th><th class="num">Reg h</th><th class="num">OT h</th><th class="num">Hol h</th><th class="num">Basic</th><th class="num">Overtime</th><th class="num">Holiday</th><th class="num">Allow.</th><th class="num">Gross</th><th class="num">NIB ee</th><th class="num">NHIP ee</th><th class="num">Other</th><th class="num">Net</th><th class="num">NIB er</th><th class="num">NHIP er</th><th>Flags</th></tr></thead><tbody>` +
+    r.lines.map(l => `<tr><td>${esc(l.name)}<br><span class="muted small">${esc(l.empId)} · ${l.type}</span></td><td class="num">${l.hours.regular}</td><td class="num">${l.hours.overtime}</td><td class="num">${l.hours.holiday}</td><td class="num">${money(l.basic)}</td><td class="num">${money(l.ot)}</td><td class="num">${money(l.hol)}</td><td class="num">${money(l.allowance)}</td><td class="num"><b>${money(l.gross)}</b></td><td class="num">${money(l.nibEE)}</td><td class="num">${money(l.nhipEE)}</td><td class="num">${money(l.loan)}</td><td class="num"><b>${money(l.net)}</b></td><td class="num">${money(l.nibER)}</td><td class="num">${money(l.nhipER)}</td><td>${l.flags.map(f => `<span class="pill ${/Below|Negative|without/.test(f) ? 'bad' : 'warn'}">${esc(f)}</span>`).join(' ')}</td></tr>`).join('') +
+    `<tr class="total"><td>Totals</td><td colspan="3"></td><td class="num">${money(sum(r.lines, 'basic'))}</td><td class="num">${money(sum(r.lines, 'ot'))}</td><td class="num">${money(sum(r.lines, 'hol'))}</td><td class="num">${money(sum(r.lines, 'allowance'))}</td><td class="num">${money(t.gross)}</td><td class="num">${money(t.nibEE)}</td><td class="num">${money(t.nhipEE)}</td><td class="num">${money(t.loan)}</td><td class="num">${money(t.net)}</td><td class="num">${money(t.nibER)}</td><td class="num">${money(t.nhipER)}</td><td></td></tr>` +
+    `</tbody></table></div></div>`;
+};
+const sum = (arr, k) => r2(arr.reduce((a, x) => a + (x[k] || 0), 0));
+
+/* ---------- Payslips ---------- */
+views.payslips = () => {
+  const r = S.payruns.find(x => x.id === currentRun); if (!r) return views.payruns();
+  return `<div class="head noprint"><div><h1>Payslips · ${esc(r.id)}</h1><p>One slip per employee. Print, or choose "Save as PDF" in the print dialog, to distribute by email.</p></div>
+    <div class="actions"><button class="btn" data-act="openrun" data-id="${r.id}">Back to run</button><button class="btn primary" data-act="print">Print / Save as PDF</button></div></div>` +
+    r.lines.map(l => { const e = emp(l.empId) || {}; return `<div class="slip">
+      <div class="top"><div><h2>${esc(S.company.name)}</h2><div class="muted small">${esc(S.company.address)} · NIB ${esc(S.company.nibNo)} · NHIP ${esc(S.company.nhipNo)}</div></div><div style="text-align:right"><div class="small muted">Payslip</div><div style="font-family:var(--display);font-size:1.1rem">${esc(r.id)}</div></div></div>
+      <div class="meta"><div><b>Employee</b>${esc(l.name)}</div><div><b>Employee ID</b>${esc(l.empId)}</div><div><b>NIB number</b>${esc(e.nibNo || '')}</div><div><b>NHIP number</b>${esc(e.nhipNo || '')}</div><div><b>Pay period</b>${fmtDate(r.periodStart)} to ${fmtDate(r.periodEnd)}</div><div><b>Pay date</b>${fmtDate(r.payDate)}</div><div><b>Basis</b>${l.type === 'hourly' ? money(e.rate) + ' per hour' : money(e.rate) + ' per month'}</div><div><b>Paid to</b>${esc(e.bank || '')} ${e.account ? '····' + String(e.account).slice(-4) : ''}</div></div>
+      <div class="cols"><div><table><thead><tr><th>Earnings</th><th class="num">Hours</th><th class="num">Amount</th></tr></thead><tbody>
+        <tr><td>${l.type === 'hourly' ? 'Regular hours' : 'Salary'}</td><td class="num">${l.type === 'hourly' ? l.hours.regular : ''}</td><td class="num">${money(l.basic)}</td></tr>
+        ${l.ot ? `<tr><td>Overtime at ${r.rules.overtimeMultiplier}x</td><td class="num">${l.hours.overtime}</td><td class="num">${money(l.ot)}</td></tr>` : ''}
+        ${l.hol ? `<tr><td>Public holiday at ${r.rules.holidayMultiplier}x</td><td class="num">${l.hours.holiday}</td><td class="num">${money(l.hol)}</td></tr>` : ''}
+        ${l.allowance ? `<tr><td>Allowance</td><td></td><td class="num">${money(l.allowance)}</td></tr>` : ''}
+        <tr class="total"><td>Gross pay</td><td></td><td class="num">${money(l.gross)}</td></tr></tbody></table></div>
+      <div><table><thead><tr><th>Deductions</th><th class="num">Base</th><th class="num">Amount</th></tr></thead><tbody>
+        <tr><td>National Insurance (${r.rules.nibEmployee}%)</td><td class="num">${money(l.nibBase)}</td><td class="num">${money(l.nibEE)}</td></tr>
+        <tr><td>National Health Insurance (${r.rules.nhipEmployee}%)</td><td class="num">${money(l.nhipBase)}</td><td class="num">${money(l.nhipEE)}</td></tr>
+        ${l.loan ? `<tr><td>Loan / advance</td><td></td><td class="num">${money(l.loan)}</td></tr>` : ''}
+        <tr class="total"><td>Total deductions</td><td></td><td class="num">${money(l.deductions)}</td></tr></tbody></table>
+        <table style="margin-top:10px"><thead><tr><th>Employer contributions (not deducted)</th><th class="num">Amount</th></tr></thead><tbody><tr><td>NIB employer (${r.rules.nibEmployer}%)</td><td class="num">${money(l.nibER)}</td></tr><tr><td>NHIP employer (${r.rules.nhipEmployer}%)</td><td class="num">${money(l.nhipER)}</td></tr></tbody></table></div></div>
+      <div class="net"><div>Net pay</div><div class="v">${money(l.net)}</div></div>
+      <div class="foot">Turks and Caicos Islands levy no income tax; the only statutory deductions are NIB and NHIP. Queries to ${esc(S.company.name)} payroll.</div>
+    </div>`; }).join('');
+};
+
+/* ---------- Reports ---------- */
+views.reports = () => {
+  const finals = S.payruns.filter(r => r.status === 'final');
+  const months = [...new Set(finals.map(r => r.payDate.slice(0, 7)))].sort().reverse();
+  const sel = S._month && months.includes(S._month) ? S._month : months[0];
+  const runs = finals.filter(r => r.payDate.slice(0, 7) === sel);
+  const byEmp = {};
+  runs.forEach(r => r.lines.forEach(l => { const b = byEmp[l.empId] = byEmp[l.empId] || { name: l.name, gross: 0, nibBase: 0, nibEE: 0, nibER: 0, nhipBase: 0, nhipEE: 0, nhipER: 0 }; ['gross', 'nibBase', 'nibEE', 'nibER', 'nhipBase', 'nhipEE', 'nhipER'].forEach(k => b[k] = r2(b[k] + l[k])); }));
+  const rows = Object.entries(byEmp);
+  const tot = k => r2(rows.reduce((a, [, v]) => a + v[k], 0));
+  const label = sel ? new Date(sel + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : '';
+  return `
+  <div class="head"><div><h1>Remittances &amp; Xero</h1><p>Monthly schedules by pay date month, built from finalised runs only. NIB is due by the ${S.rules.nibDueDay}th and NHIP by the ${S.rules.nhipDueDay}th of the following month.</p></div>
+    <div class="actions">${months.length ? `<select id="rep-month" class="btn">${months.map(m => `<option value="${m}" ${m === sel ? 'selected' : ''}>${new Date(m + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</option>`).join('')}</select>` : ''}</div></div>
+  ${!months.length ? '<div class="panel"><p class="muted">Finalise a pay run to see remittance schedules.</p></div>' : `
+  <div class="cards">
+    <div class="card"><div class="k">NIB remittance · ${label}</div><div class="v">${money(tot('nibEE') + tot('nibER'))}</div><div class="s">Due ${dueDate(sel, S.rules.nibDueDay)} · employee ${money(tot('nibEE'))} + employer ${money(tot('nibER'))}</div></div>
+    <div class="card"><div class="k">NHIP remittance · ${label}</div><div class="v">${money(tot('nhipEE') + tot('nhipER'))}</div><div class="s">Due ${dueDate(sel, S.rules.nhipDueDay)} · employee ${money(tot('nhipEE'))} + employer ${money(tot('nhipER'))}</div></div>
+    <div class="card"><div class="k">Runs included</div><div class="v">${runs.length}</div><div class="s">${runs.map(r => r.id).join(', ')}</div></div>
+  </div>
+  <div class="panel"><div class="head" style="margin-bottom:10px"><h2>NIB contribution schedule</h2><div class="actions"><button class="btn sm" data-act="csv-nib" data-m="${sel}">Download CSV</button></div></div>
+    <div class="tablewrap"><table><thead><tr><th>Employee</th><th>NIB no.</th><th class="num">Gross</th><th class="num">Insurable</th><th class="num">Employee</th><th class="num">Employer</th><th class="num">Total</th></tr></thead><tbody>` +
+    rows.map(([id, v]) => `<tr><td>${esc(v.name)}</td><td>${esc((emp(id) || {}).nibNo || '')}</td><td class="num">${money(v.gross)}</td><td class="num">${money(v.nibBase)}</td><td class="num">${money(v.nibEE)}</td><td class="num">${money(v.nibER)}</td><td class="num">${money(v.nibEE + v.nibER)}</td></tr>`).join('') +
+    `<tr class="total"><td>Total</td><td></td><td class="num">${money(tot('gross'))}</td><td class="num">${money(tot('nibBase'))}</td><td class="num">${money(tot('nibEE'))}</td><td class="num">${money(tot('nibER'))}</td><td class="num">${money(tot('nibEE') + tot('nibER'))}</td></tr></tbody></table></div></div>
+  <div class="panel"><div class="head" style="margin-bottom:10px"><h2>NHIP contribution schedule</h2><div class="actions"><button class="btn sm" data-act="csv-nhip" data-m="${sel}">Download CSV</button></div></div>
+    <div class="tablewrap"><table><thead><tr><th>Employee</th><th>NHIP no.</th><th>Permit</th><th class="num">Gross</th><th class="num">Insurable</th><th class="num">Employee</th><th class="num">Employer</th><th class="num">Total</th></tr></thead><tbody>` +
+    rows.map(([id, v]) => { const e = emp(id) || {}; return `<tr><td>${esc(v.name)}</td><td>${esc(e.nhipNo || '')}</td><td>${e.workPermit ? 'Yes' : ''}</td><td class="num">${money(v.gross)}</td><td class="num">${money(v.nhipBase)}</td><td class="num">${money(v.nhipEE)}</td><td class="num">${money(v.nhipER)}</td><td class="num">${money(v.nhipEE + v.nhipER)}</td></tr>`; }).join('') +
+    `<tr class="total"><td>Total</td><td colspan="2"></td><td class="num">${money(tot('gross'))}</td><td class="num">${money(tot('nhipBase'))}</td><td class="num">${money(tot('nhipEE'))}</td><td class="num">${money(tot('nhipER'))}</td><td class="num">${money(tot('nhipEE') + tot('nhipER'))}</td></tr></tbody></table></div></div>
+  <div class="panel"><h2>Xero</h2><p class="muted" style="margin-bottom:10px">Each finalised run exports a manual journal CSV for Xero's import (Accounting > Manual journals > Import). Accounts are set in Settings. The bank file is a plain CSV of net pay per employee for the bank's bulk payment upload.</p>
+    <div class="tablewrap"><table><thead><tr><th>Run</th><th>Pay date</th><th class="num">Gross</th><th class="num">Net</th><th></th></tr></thead><tbody>` +
+    runs.map(r => { const t = runTotals(r.lines); return `<tr><td>${r.id}</td><td>${fmtDate(r.payDate)}</td><td class="num">${money(t.gross)}</td><td class="num">${money(t.net)}</td><td><button class="btn sm" data-act="xero" data-id="${r.id}">Xero journal</button> <button class="btn sm" data-act="bankfile" data-id="${r.id}">Bank file</button> <button class="btn sm" data-act="openrun" data-id="${r.id}">Open</button></td></tr>`; }).join('') + '</tbody></table></div></div>'}`;
+};
+
+/* ---------- Settings ---------- */
+views.settings = () => {
+  const R = S.rules, C = S.company, A = S.accounts || defaultAccounts();
+  const f = (id, label, val, hint, type = 'number', step = '0.01') => `<div class="field"><label>${label}</label><input id="${id}" type="${type}" step="${step}" value="${esc(val)}">${hint ? `<span class="hint">${hint}</span>` : ''}</div>`;
+  return `
+  <div class="head"><div><h1>Settings &amp; rules</h1><p>Company details, statutory rates and the Xero account codes. Every pay run stores the rules it was calculated with, so changing these affects future runs only.</p></div>
+    <div class="actions"><button class="btn" data-act="backup">Download backup</button><button class="btn" data-act="restore">Restore backup</button><button class="btn danger" data-act="reset">Reset to demo</button></div></div>
+  <div class="panel"><h2>Company</h2><div class="form">
+    ${f('c-name', 'Company name', C.name, '', 'text')}${f('c-nib', 'NIB employer number', C.nibNo, '', 'text')}${f('c-nhip', 'NHIP employer number', C.nhipNo, '', 'text')}
+    <div class="field"><label>Default pay frequency</label><select id="c-freq">${Object.keys(PERIOD_LABEL).map(k => `<option value="${k}" ${k === C.payFrequency ? 'selected' : ''}>${PERIOD_LABEL[k]}</option>`).join('')}</select></div>
+    ${f('c-addr', 'Address', C.address, '', 'text')}</div></div>
+  <div class="panel"><h2>National Insurance (NIB)</h2><div class="form">
+    ${f('r-nibee', 'Employee rate %', R.nibEmployee, 'Private sector 5.5% from 1 Apr 2024')}${f('r-niber', 'Employer rate %', R.nibEmployer, 'Private sector 6.5%')}${f('r-nibse', 'Self-employed rate %', R.nibSelfEmployed, 'Reference only; not used in runs')}
+    ${f('r-nibceil', 'Insurable earnings ceiling per month $', R.nibCeilingMonthly, 'Scaled to the pay period. $4,000 per the 2022 Regulations; confirm the current figure with the NIB')}${f('r-nibdue', 'Due day of following month', R.nibDueDay, '', 'number', '1')}</div></div>
+  <div class="panel"><h2>National Health Insurance (NHIP)</h2><div class="form">
+    ${f('r-nhipee', 'Employee rate %', R.nhipEmployee)}${f('r-nhiper', 'Employer rate %', R.nhipEmployer)}${f('r-nhipceil', 'Earnings ceiling per month $', R.nhipCeilingMonthly, '$7,800 per month, $1,800 per week')}
+    ${f('r-nhipmin', 'Minimum contribution per side per month $', R.nhipMinMonthlyEachSide, 'Applied when 3% of earnings is below this')}${f('r-nhipdue', 'Due day of following month', R.nhipDueDay, '', 'number', '1')}</div></div>
+  <div class="panel"><h2>Employment Ordinance</h2><div class="form">
+    ${f('r-week', 'Standard week hours', R.standardWeekHours, 'Used to derive an hourly rate for salaried overtime', 'number', '1')}${f('r-ot', 'Overtime multiplier', R.overtimeMultiplier)}${f('r-hol', 'Public holiday multiplier', R.holidayMultiplier)}
+    ${f('r-mw', 'Minimum wage $/h', R.minWage, 'From 1 Apr 2023')}${f('r-mws', 'Sector minimum wage $/h', R.minWageSector, 'Security, manufacturing, construction, banking, financial services, insurance')}</div></div>
+  <div class="panel"><h2>Xero account codes</h2><div class="form">
+    ${f('a-wages', 'Wages expense', A.wages, '', 'text')}${f('a-nibexp', 'Employer NIB expense', A.nibExpense, '', 'text')}${f('a-nhipexp', 'Employer NHIP expense', A.nhipExpense, '', 'text')}
+    ${f('a-nibliab', 'NIB payable', A.nibPayable, '', 'text')}${f('a-nhipliab', 'NHIP payable', A.nhipPayable, '', 'text')}${f('a-net', 'Net wages payable', A.netPayable, '', 'text')}${f('a-loan', 'Staff loans', A.loans, '', 'text')}</div></div>
+  <div class="actions" style="margin-top:16px"><button class="btn primary" data-act="savesettings">Save settings</button></div>
+  <div class="panel" style="margin-top:20px"><h2>Statutory summary used by this MVP</h2><div class="rules">
+    <div class="panel"><h3>Contributions</h3><dl><dt>NIB employee / employer</dt><dd>${R.nibEmployee}% / ${R.nibEmployer}%</dd><dt>NIB ceiling</dt><dd>${money(R.nibCeilingMonthly)} / month</dd><dt>NHIP employee / employer</dt><dd>${R.nhipEmployee}% / ${R.nhipEmployer}%</dd><dt>NHIP ceiling</dt><dd>${money(R.nhipCeilingMonthly)} / month</dd><dt>NHIP minimum each side</dt><dd>${money(R.nhipMinMonthlyEachSide)} / month</dd><dt>Income tax / PAYE</dt><dd>None</dd><dt>Mandatory private pension</dt><dd>None (NIB is the pension)</dd></dl></div>
+    <div class="panel"><h3>Hours and pay</h3><dl><dt>Standard week</dt><dd>${R.standardWeekHours} h</dd><dt>Overtime</dt><dd>${R.overtimeMultiplier}x</dd><dt>Public holidays</dt><dd>${R.holidayMultiplier}x</dd><dt>Minimum wage</dt><dd>${money(R.minWage)} / ${money(R.minWageSector)} per h</dd><dt>Vacation</dt><dd>2 weeks per year</dd><dt>Sick leave</dt><dd>12 days per year</dd><dt>Maternity</dt><dd>14 weeks (NIB allowance 60%)</dd></dl></div>
+    <div class="panel"><h3>Filing</h3><dl><dt>NIB remittance</dt><dd>by ${R.nibDueDay}th next month</dd><dt>NHIP remittance</dt><dd>by ${R.nhipDueDay}th next month</dd><dt>Work permit holders</dt><dd>NHIP from permit approval</dd><dt>Severance</dt><dd>2 weeks per year after 2 years</dd></dl></div>
+  </div></div>`;
+};
+function defaultAccounts() { return { wages: '477 Wages and Salaries', nibExpense: '478 NIB Employer Contributions', nhipExpense: '479 NHIP Employer Contributions', nibPayable: '825 NIB Payable', nhipPayable: '826 NHIP Payable', netPayable: '814 Wages Payable', loans: '610 Staff Loans' }; }
+
+/* ===================== Exports ===================== */
+function download(name, text) {
+  const blob = new Blob([text], { type: 'text/csv;charset=utf-8' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+const csvq = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+function xeroJournal(r) {
+  const A = S.accounts || defaultAccounts(); const t = runTotals(r.lines);
+  const narr = 'Payroll ' + r.id + ' ' + r.periodStart + ' to ' + r.periodEnd;
+  const d = r.payDate.split('-').reverse().join('/');
+  const rows = [['*Narration', '*Date', 'Description', '*AccountCode', '*TaxRate', '*Amount', 'TrackingName1', 'TrackingOption1']];
+  const line = (desc, acct, amt) => rows.push([narr, d, desc, acct.split(' ')[0], 'Tax Exempt', amt.toFixed(2), '', '']);
+  line('Gross wages', A.wages, t.gross);
+  line('Employer NIB', A.nibExpense, t.nibER);
+  line('Employer NHIP', A.nhipExpense, t.nhipER);
+  line('NIB payable (employee + employer)', A.nibPayable, -(t.nibEE + t.nibER));
+  line('NHIP payable (employee + employer)', A.nhipPayable, -(t.nhipEE + t.nhipER));
+  if (t.loan) line('Staff loan repayments', A.loans, -t.loan);
+  line('Net wages payable', A.netPayable, -t.net);
+  download('xero-manual-journal-' + r.id + '.csv', rows.map(x => x.map(csvq).join(',')).join('\n'));
+}
+function bankFile(r) {
+  const rows = [['Employee ID', 'Name', 'Bank', 'Account', 'Amount', 'Reference']];
+  r.lines.forEach(l => { const e = emp(l.empId) || {}; rows.push([l.empId, l.name, e.bank || '', e.account || '', l.net.toFixed(2), S.company.name.slice(0, 12) + ' ' + r.payDate]); });
+  download('bank-payments-' + r.id + '.csv', rows.map(x => x.map(csvq).join(',')).join('\n'));
+}
+function remitCSV(kind, month) {
+  const runs = S.payruns.filter(r => r.status === 'final' && r.payDate.slice(0, 7) === month);
+  const by = {}; runs.forEach(r => r.lines.forEach(l => { const b = by[l.empId] = by[l.empId] || { name: l.name, gross: 0, base: 0, ee: 0, er: 0 }; b.gross = r2(b.gross + l.gross); b.base = r2(b.base + (kind === 'nib' ? l.nibBase : l.nhipBase)); b.ee = r2(b.ee + (kind === 'nib' ? l.nibEE : l.nhipEE)); b.er = r2(b.er + (kind === 'nib' ? l.nibER : l.nhipER)); }));
+  const rows = [['Employer No', 'Month', 'Employee ID', 'Name', kind.toUpperCase() + ' No', 'Gross', 'Insurable', 'Employee', 'Employer', 'Total']];
+  Object.entries(by).forEach(([id, b]) => { const e = emp(id) || {}; rows.push([kind === 'nib' ? S.company.nibNo : S.company.nhipNo, month, id, b.name, kind === 'nib' ? e.nibNo : e.nhipNo, b.gross.toFixed(2), b.base.toFixed(2), b.ee.toFixed(2), b.er.toFixed(2), (b.ee + b.er).toFixed(2)]); });
+  download(kind + '-schedule-' + month + '.csv', rows.map(x => x.map(csvq).join(',')).join('\n'));
+}
+
+/* ===================== Modal ===================== */
+function modal(html) { const root = document.getElementById('modal-root'); root.innerHTML = `<div class="modal-bg"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`; const c = document.getElementById('m-cancel'); if (c) c.onclick = closeModal; root.querySelector('.modal-bg').addEventListener('click', ev => { if (ev.target.classList.contains('modal-bg')) closeModal(); }); }
+function closeModal() { document.getElementById('modal-root').innerHTML = ''; }
+function confirmBox(msg, onYes) { modal(`<h2>Please confirm</h2><p>${esc(msg)}</p><div class="foot"><button class="btn" id="m-cancel">Cancel</button><button class="btn primary" id="m-yes">Yes</button></div>`); document.getElementById('m-yes').onclick = () => { closeModal(); onYes(); }; }
+
+/* ===================== Actions ===================== */
+function bind() {
+  document.querySelectorAll('[data-act]').forEach(el => { if (el._bound) return; el._bound = true; el.addEventListener('click', () => act(el.dataset.act, el.dataset)); });
+  const m = document.getElementById('rep-month'); if (m && !m._bound) { m._bound = true; m.addEventListener('change', () => { S._month = m.value; render(); }); }
+}
+function act(a, d) {
+  const run = () => S.payruns.find(x => x.id === (d.id || currentRun));
+  switch (a) {
+    case 'newrun': newRunForm(); break;
+    case 'openrun': openRun(d.id); break;
+    case 'back': go('payruns'); break;
+    case 'addemp': empForm(); break;
+    case 'editemp': empForm(emp(d.id)); break;
+    case 'exportemp': download('employees.csv', [['ID', 'Name', 'Role', 'Type', 'Rate', 'Sector', 'NIB', 'NHIP', 'Work permit', 'Start', 'Status']].concat(S.employees.map(e => [e.id, e.name, e.role, e.type, e.rate, e.sector, e.nibNo, e.nhipNo, e.workPermit ? 'Y' : 'N', e.startDate, e.status])).map(x => x.map(csvq).join(',')).join('\n')); break;
+    case 'hsample': document.getElementById('h-csv').value = 'Employee ID,Name,Regular Hours,Overtime Hours,Holiday Hours\n' + S.employees.filter(e => e.type === 'hourly' && e.status === 'active').map((e, i) => [e.id, e.name, 80 + (i * 3) % 9, (i * 5) % 12, i % 3 === 0 ? 8 : 0].join(',')).join('\n'); if (!document.getElementById('h-label').value) document.getElementById('h-label').value = 'Sample batch'; break;
+    case 'hparse': hoursPreview(); break;
+    case 'hsave': { const rows = document.getElementById('h-preview')._rows || []; const label = document.getElementById('h-label').value.trim() || 'Hours batch'; const ps = document.getElementById('h-start').value, pe = document.getElementById('h-end').value; if (!ps || !pe) { toast('Period dates are required'); return; } S.hoursBatches.push({ id: 'H' + Date.now(), label, periodStart: ps, periodEnd: pe, source: 'import', rows }); save(); render(); toast('Batch saved'); break; }
+    case 'hview': { const b = S.hoursBatches.find(x => x.id === d.id); modal(`<h2>${esc(b.label)}</h2><div class="tablewrap"><table><thead><tr><th>ID</th><th>Employee</th><th class="num">Regular</th><th class="num">Overtime</th><th class="num">Holiday</th></tr></thead><tbody>${b.rows.map(r => `<tr><td>${esc(r.empId)}</td><td>${esc((emp(r.empId) || {}).name || '')}</td><td class="num">${r.regular}</td><td class="num">${r.overtime}</td><td class="num">${r.holiday}</td></tr>`).join('')}</tbody></table></div><div class="foot"><button class="btn" id="m-cancel">Close</button></div>`); break; }
+    case 'hdel': confirmBox('Delete this hours batch?', () => { S.hoursBatches = S.hoursBatches.filter(x => x.id !== d.id); save(); render(); }); break;
+    case 'recalc': { const r = run(); const b = S.hoursBatches.find(x => x.id === r.batchId); r.rules = { ...S.rules }; r.lines = S.employees.filter(e => e.status === 'active').map(e => { const h = b ? b.rows.find(x => x.empId === e.id) : null; if (e.type === 'hourly' && !h) return null; return calcLine(e, h, r.freq, S.rules); }).filter(Boolean); save(); render(); toast('Recalculated with current employees and rules'); break; }
+    case 'finalise': confirmBox('Finalise this run? Figures lock and feed the remittance schedules.', () => { run().status = 'final'; save(); render(); toast('Run finalised'); }); break;
+    case 'delrun': confirmBox('Delete this draft run?', () => { S.payruns = S.payruns.filter(x => x.id !== currentRun); save(); go('payruns'); }); break;
+    case 'payslips': view = 'payslips'; render(); window.scrollTo(0, 0); break;
+    case 'print': window.print(); break;
+    case 'xero': xeroJournal(run()); break;
+    case 'bankfile': bankFile(run()); break;
+    case 'csv-nib': remitCSV('nib', d.m); break;
+    case 'csv-nhip': remitCSV('nhip', d.m); break;
+    case 'savesettings': { const g = id => document.getElementById(id).value; const n = id => +g(id) || 0;
+      S.company = { ...S.company, name: g('c-name'), nibNo: g('c-nib'), nhipNo: g('c-nhip'), payFrequency: g('c-freq'), address: g('c-addr') };
+      S.rules = { nibEmployee: n('r-nibee'), nibEmployer: n('r-niber'), nibSelfEmployed: n('r-nibse'), nibCeilingMonthly: n('r-nibceil'), nibDueDay: n('r-nibdue'), nhipEmployee: n('r-nhipee'), nhipEmployer: n('r-nhiper'), nhipCeilingMonthly: n('r-nhipceil'), nhipMinMonthlyEachSide: n('r-nhipmin'), nhipDueDay: n('r-nhipdue'), standardWeekHours: n('r-week'), overtimeMultiplier: n('r-ot'), holidayMultiplier: n('r-hol'), minWage: n('r-mw'), minWageSector: n('r-mws') };
+      S.accounts = { wages: g('a-wages'), nibExpense: g('a-nibexp'), nhipExpense: g('a-nhipexp'), nibPayable: g('a-nibliab'), nhipPayable: g('a-nhipliab'), netPayable: g('a-net'), loans: g('a-loan') };
+      save(); render(); toast('Settings saved'); break; }
+    case 'backup': { const blob = new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'tci-payroll-backup-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 500); break; }
+    case 'restore': { const i = document.createElement('input'); i.type = 'file'; i.accept = '.json,application/json'; i.onchange = () => { const f = i.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => { try { const j = JSON.parse(rd.result); if (!j.employees || !j.rules) throw 0; S = j; save(); render(); toast('Backup restored'); } catch (e) { toast('That file is not a TCI Payroll backup'); } }; rd.readAsText(f); }; i.click(); break; }
+    case 'reset': confirmBox('Replace everything with the demo data?', () => { S = seedDemo(); save(); go('dashboard'); }); break;
+  }
+}
+render();
+</script>
+</body>
+</html>
