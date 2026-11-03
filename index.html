@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TCI Payroll</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/icon.png">
 <meta name="description" content="Payroll MVP for Turks and Caicos employers: hours import, NIB and NHIP contributions, payslips, remittance schedules and Xero journals.">
 <style>
 /* Layout: left rail of sections, one working area; data tables dominate, type stays quiet, coral marks the one action that matters on each screen. */
@@ -41,7 +43,8 @@ h3 { font-size: 1.05rem; }
 
 .app { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100%; }
 .rail { background: var(--navy); color: var(--navy-fg); padding: 22px 16px calc(22px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 6px; position: sticky; top: 0; height: 100svh; }
-.rail .logo { font-family: var(--display); font-size: 1.15rem; margin-bottom: 4px; }
+.rail .logo { font-family: var(--display); font-size: 1.15rem; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+.rail .logo img { width: 34px; height: 34px; border-radius: 8px; box-shadow: 0 0 0 1px rgba(255,255,255,0.12); }
 .rail .logo span { color: var(--coral); }
 .rail .tag { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--navy-muted); margin-bottom: 18px; }
 .rail button { background: none; border: 0; color: var(--navy-muted); text-align: left; padding: 9px 10px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
@@ -152,7 +155,7 @@ pre.out { background: #fff; border: 1px solid var(--line); border-radius: 6px; p
 <body>
 <div class="app">
   <nav class="rail" aria-label="Sections">
-    <div class="logo">TCI <span>Payroll</span></div>
+    <div class="logo"><img src="assets/icon.png" alt="" width="34" height="34">TCI <span>Payroll</span></div>
     <div class="tag">MVP · Turks and Caicos</div>
     <button data-view="dashboard" class="active">Overview</button>
     <button data-view="employees">Employees <span class="count" id="c-emp">0</span></button>
@@ -478,7 +481,7 @@ views.payslips = () => {
   return `<div class="head noprint"><div><h1>Payslips · ${esc(r.id)}</h1><p>One slip per employee. Print, or choose "Save as PDF" in the print dialog, to distribute by email.</p></div>
     <div class="actions"><button class="btn" data-act="openrun" data-id="${r.id}">Back to run</button><button class="btn primary" data-act="print">Print / Save as PDF</button></div></div>` +
     r.lines.map(l => { const e = emp(l.empId) || {}; return `<div class="slip">
-      <div class="top"><div><h2>${esc(S.company.name)}</h2><div class="muted small">${esc(S.company.address)} · NIB ${esc(S.company.nibNo)} · NHIP ${esc(S.company.nhipNo)}</div></div><div style="text-align:right"><div class="small muted">Payslip</div><div style="font-family:var(--display);font-size:1.1rem">${esc(r.id)}</div></div></div>
+      <div class="top"><div><h2>${esc(S.company.name)}</h2><div class="muted small">${esc(S.company.address)} · NIB ${esc(S.company.nibNo)} · NHIP ${esc(S.company.nhipNo)}</div></div><div style="text-align:right;display:grid;justify-items:end;gap:4px"><img src="assets/logo.png" alt="TCI Payroll" style="height:48px;width:auto"><div class="small muted">Payslip ${esc(r.id)}</div></div></div>
       <div class="meta"><div><b>Employee</b>${esc(l.name)}</div><div><b>Employee ID</b>${esc(l.empId)}</div><div><b>NIB number</b>${esc(e.nibNo || '')}</div><div><b>NHIP number</b>${esc(e.nhipNo || '')}</div><div><b>Pay period</b>${fmtDate(r.periodStart)} to ${fmtDate(r.periodEnd)}</div><div><b>Pay date</b>${fmtDate(r.payDate)}</div><div><b>Basis</b>${l.type === 'hourly' ? money(e.rate) + ' per hour' : money(e.rate) + ' per month'}</div><div><b>Paid to</b>${esc(e.bank || '')} ${e.account ? '····' + String(e.account).slice(-4) : ''}</div></div>
       <div class="cols"><div><table><thead><tr><th>Earnings</th><th class="num">Hours</th><th class="num">Amount</th></tr></thead><tbody>
         <tr><td>${l.type === 'hourly' ? 'Regular hours' : 'Salary'}</td><td class="num">${l.type === 'hourly' ? l.hours.regular : ''}</td><td class="num">${money(l.basic)}</td></tr>
